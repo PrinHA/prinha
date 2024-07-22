@@ -16,7 +16,7 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            color: #ffeb3b; /* Letra amarela */
+            color: #4CAF50; /* Letra verde */
             overflow-x: hidden; /* Remove rolagem lateral */
             overflow-y: auto; /* Adicionado para garantir rolagem vertical */
         }
@@ -83,6 +83,7 @@
         }
         .skill-item span {
             flex: 1;
+            color: #4CAF50; /* Texto verde */
         }
         .actions {
             display: flex;
@@ -201,8 +202,10 @@
         const removeButton = document.createElement('button');
         removeButton.textContent = 'Remover';
         removeButton.addEventListener('click', () => {
-            skillList.removeChild(skillItem);
-            removeSkill(name);
+            if (confirm(`Você tem certeza que deseja remover a habilidade "${name}"?`)) {
+                skillList.removeChild(skillItem);
+                removeSkill(name);
+            }
         });
 
         skillItem.appendChild(skillSpan);
@@ -306,8 +309,10 @@
                 const removeButton = document.createElement('button');
                 removeButton.textContent = 'Remover';
                 removeButton.addEventListener('click', () => {
-                    skillList.removeChild(skillItem);
-                    removeSkill(skill.name);
+                    if (confirm(`Você tem certeza que deseja remover a habilidade "${skill.name}"?`)) {
+                        skillList.removeChild(skillItem);
+                        removeSkill(skill.name);
+                    }
                 });
 
                 skillItem.appendChild(skillSpan);
@@ -344,7 +349,7 @@
         }
 
         window.skillChart = new Chart(skillChartCtx, {
-            type: 'line',
+            type: 'bar', // Mudança para gráfico de barras
             data: chartData,
             options: {
                 animation: {
