@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prin's Life</title>
+    <link rel="manifest" href="/prinha/manifest.json">
+    <meta name="theme-color" content="#4CAF50">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: #333;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 800px;
+            text-align: center;
+            border: 3px solid black; 
+            position: relative;
+        }
+        .container::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 800px;
+            height: 3px;
+            background-color: black;
+        }
+        h1 {
+            color: #4CAF50;
+            margin-bottom: 20px;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            width: calc(100% - 30px);
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            width: auto;
+            padding: 10px 20px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .sort-buttons, .filter-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .skill-list {
+            list-style: none;
+            padding: 0;
+            width: 100%;
+        }
+        .skill-item {
+            background-color: #e9e9e9;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .skill-item span {
+            flex: 1;
+        }
+        .actions {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        #chart-container {
+            width: 100%;
+            max-width: 800px;
+            margin-top: 20px;
+        }
+        .notification {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <h1>Prin's Life</h1>
+    <form id="skill-form">
+        <input type="text" id="skill-name" placeholder="Nome da Habilidade" required>
+        <input type="number" id="skill-score" placeholder="Pontuação Inicial" required>
+        <button type="submit">Adicionar Habilidade</button>
+    </form>
+    <div class="sort-buttons">
+        <button id="sort-name">Ordenar por Nome</button>
+        <button id="sort-score">Ordenar por Pontuação</button>
+    </div>
+    <ul id="skill-list" class="skill-list"></ul>
+    <div id="chart-container">
+        <canvas id="skill-chart"></canvas>
+    </div>
+    <div id="notification" class="notification"></div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', (event) => {
+        loadSkills();
+        renderChart();
+    });
+
+    const skillForm = document.getElementById('skill-form');
+    const skillList = document.getElementById('skill-list');
+    const skillChartCtx = document.getElementById('skill-chart').getContext('2d');
+    const notification = document.getElementById('notification');
+
+    let skills = [];
+
+    skillForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        
+        const skillName = document.getElementById('skill-name').value;
+        const skillScore = parseInt(document.getElementById('skill-score').value);
+        addSkill(skillName, skillScore);
+        
+        skillForm.reset();
+    });
+
+    document.getElementById('sort-name').addEventListener('click', () => {
+        skills.sort((a, b) => a.name.localeCompare(b.name));
+        renderSkills();
+    });
+
+    document.getElementById('sort-score').addEventListener('click', () => {
+        skills.sort((a, b) => b.score - a.score);
+        renderSkills();
+    });
+
+    function addSkill(name, score) {
+        const skillItem = document.createElement('li');
+        skillItem.classList.add('skill-item');
+
+        const skillSpan = document.createElement('span');
+        skillSpan.textContent = `${name} - Pontuação: ${score} - Nível: ${calculateLevel(score)}`;
+        
+        const incrementButton = document.createElement('button');
+        incrementButton.textContent = '+';
+        incrementButton.addEventListener('click', () => {
+            score += 15; // Incrementa a pontuação
+            const oldLevel = calculateLevel(score - 15);
+            const newLevel = calculateLevel(score);
+            if (newLevel !== oldLevel) {
+                showNotification(`${name} subiu para ${newLevel}!`);
+            }
+            updateSkill(skillItem, skillSpan, name, score);
+        });
+
+        const decrementButton = document.createElement('button');
+        decrementButton.textContent = '-';
+        decrementButton.addEventListener('click', () => {
+            if (score > 0) {
+                score -= 15; // Decrementa a pontuação
+                updateSkill(skillItem, skillSpan, name, score);
+            }
+        });
+
+        const editButton = document.createElement('button');
+        editButton.textContent = 'Editar';
+        editButton.addEventListener('click', () => {
+            const newName = prompt('Novo nome da habilidade:', name);
+            const newScore = parseInt(prompt('Nova pontuação da habilidade:', score));
+            if (newName && !isNaN(newScore)) {
+                name = newName;
+                score = newScore;
+                updateSkill(skillItem, skillSpan, name, score);
+            }
+        });
+
+        const removeButton = document.createElement('button');
+        removeButton.textContent = 'Remover';
+        removeButton.addEventListener('click', () => {
+            skillList.removeChild(skillItem);
+            removeSkill(name);
+        });
+
+        skillItem.appendChild(skillSpan);
+        const actions = document.createElement('div');
+        actions.classList.add('actions');
+        actions.appendChild(incrementButton);
+        actions.appendChild(decrementButton);
+        actions.appendChild(editButton);
+        actions.appendChild(removeButton);
+        skillItem.appendChild(actions);
+        skillList.appendChild(skillItem);
+
+        skills.push({ name, score });
+        saveSkills();
+        renderChart();
+    }
+
+    function updateSkill(skillItem, skillSpan, name, score) {
+        skillSpan.textContent = `${name} - Pontuação: ${score} - Nível: ${calculateLevel(score)}`;
+        const skillIndex = skills.findIndex(skill => skill.name === name);
+        if (skillIndex > -1) {
+            skills[skillIndex].score = score;
+        }
+        saveSkills();
+        renderChart();
+    }
+
+    function calculateLevel(score) {
+        if (score >= 3000) return 'Master';
+        if (score >= 2500) return 'Challenger';
+        if (score >= 2001) return 'Nível 10';
+        if (score >= 1751) return 'Nível 9';
+        if (score >= 1531) return 'Nível 8';
+        if (score >= 1351) return 'Nível 7';
+        if (score >= 1201) return 'Nível 6';
+        if (score >= 1051) return 'Nível 5';
+        if (score >= 901) return 'Nível 4';
+        if (score >= 751) return 'Nível 3';
+        if (score >= 501) return 'Nível 2';
+        return 'Nível 1';
+    }
+
+    function saveSkills() {
+        localStorage.setItem('skills', JSON.stringify(skills));
+    }
+
+    function removeSkill(name) {
+        skills = skills.filter(skill => skill.name !== name);
+        saveSkills();
+        renderChart();
+    }
+
+    function loadSkills() {
+        skills = JSON.parse(localStorage.getItem('skills')) || [];
+        renderSkills();
+    }
+
+    function renderSkills(filterLevel = 'all', query = '') {
+        skillList.innerHTML = '';
+        skills.forEach(skill => {
+            if ((filterLevel === 'all' || calculateLevel(skill.score) === filterLevel)) {
+                const skillItem = document.createElement('li');
+                skillItem.classList.add('skill-item');
+
+                const skillSpan = document.createElement('span');
+                skillSpan.textContent = `${skill.name} - Pontuação: ${skill.score} - Nível: ${calculateLevel(skill.score)}`;
+
+                const incrementButton = document.createElement('button');
+                incrementButton.textContent = '+';
+                incrementButton.addEventListener('click', () => {
+                    skill.score += 15; // Incrementa a pontuação
+                    const oldLevel = calculateLevel(skill.score - 15);
+                    const newLevel = calculateLevel(skill.score);
+                    if (newLevel !== oldLevel) {
+                        showNotification(`${skill.name} subiu para ${newLevel}!`);
+                    }
+                    updateSkill(skillItem, skillSpan, skill.name, skill.score);
+                });
+
+                const decrementButton = document.createElement('button');
+                decrementButton.textContent = '-';
+                decrementButton.addEventListener('click', () => {
+                    if (skill.score > 0) {
+                        skill.score -= 15; // Decrementa a pontuação
+                        updateSkill(skillItem, skillSpan, skill.name, skill.score);
+                    }
+                });
+
+                const editButton = document.createElement('button');
+                editButton.textContent = 'Editar';
+                editButton.addEventListener('click', () => {
+                    const newName = prompt('Novo nome da habilidade:', skill.name);
+                    const newScore = parseInt(prompt('Nova pontuação da habilidade:', skill.score));
+                    if (newName && !isNaN(newScore)) {
+                        skill.name = newName;
+                        skill.score = newScore;
+                        updateSkill(skillItem, skillSpan, skill.name, skill.score);
+                    }
+                });
+
+                const removeButton = document.createElement('button');
+                removeButton.textContent = 'Remover';
+                removeButton.addEventListener('click', () => {
+                    skillList.removeChild(skillItem);
+                    removeSkill(skill.name);
+                });
+
+                skillItem.appendChild(skillSpan);
+                const actions = document.createElement('div');
+                actions.classList.add('actions');
+                actions.appendChild(incrementButton);
+                actions.appendChild(decrementButton);
+                actions.appendChild(editButton);
+                actions.appendChild(removeButton);
+                skillItem.appendChild(actions);
+                skillList.appendChild(skillItem);
+            }
+        });
+    }
+
+    function renderChart() {
+        const skillNames = skills.map(skill => skill.name);
+        const skillScores = skills.map(skill => skill.score);
+
+        const chartData = {
+            labels: skillNames,
+            datasets: [{
+                label: 'Pontuação das Habilidades',
+                data: skillScores,
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1,
+                fill: false
+            }]
+        };
+
+        if (window.skillChart) {
+            window.skillChart.destroy();
+        }
+
+        window.skillChart = new Chart(skillChartCtx, {
+            type: 'line',
+            data: chartData,
+            options: {
+                animation: {
+                    duration: 1000,
+                    easing: 'easeInOutBounce'
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    function showNotification(message) {
+        notification.textContent = message;
+        notification.style.display = 'block';
+        setTimeout(() => {
+            notification.style.display = 'none';
+        }, 3000);
+    }
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/prinha/service-worker.js')
+        .then(registration => {
+          console.log('ServiceWorker registration successful with scope: ', registration.scope);
+        }, error => {
+          console.log('ServiceWorker registration failed: ', error);
+        });
+    });
+  }
+</script>
+
+</body>
+</html>
